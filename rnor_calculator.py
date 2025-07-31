@@ -12,18 +12,26 @@ def is_resident(stay_days):
 def calc_days_in_india(travel_data, fy_start, fy_end):
     total_days = 0
     for trip in travel_data:
-        dep = trip["departure"]
-        ret = trip["return"]
+        dep = trip.get("departure")
+        ret = trip.get("return")
 
+        if not dep or not ret or dep >= ret:
+            continue  # skip invalid trip entries
+
+        # If the trip is entirely outside the FY, skip
         if ret < fy_start or dep > fy_end:
             continue
 
-        actual_return = min(ret, fy_end)
+        # Overlapping dates
         actual_depart = max(dep, fy_start)
+        actual_return = min(ret, fy_end)
 
-        days_abroad = (actual_return - actual_depart).days
-        total_days += max((fy_end - fy_start).days - days_abroad, 0)
+        days_outside = (actual_return - actual_depart).days
+        days_in_fy = (fy_end - fy_start).days
+        total_days += max(days_in_fy - days_outside, 0)
+
     return total_days
+
 
 def count_non_resident_years(flags):
     return flags.count(False)
@@ -67,6 +75,8 @@ if submit:
         fy_start = datetime(start_fy + i, 4, 1)
         fy_end = datetime(start_fy + i + 1, 3, 31)
 
+        st.write("DEBUG travel_data:", travel_data)
+
         days_in_india = calc_days_in_india(travel_data, fy_start, fy_end)
         resident = is_resident(days_in_india)
 
@@ -74,6 +84,7 @@ if submit:
             preceding_10 = resident_flags[max(0, i-10):i]
             preceding_7 = resident_flags[max(0, i-7):i]
             nonres_10 = count_non_resident_years(preceding_10)
+            st.write("DEBUG travel_data:", travel_data)
             stay_7yrs = sum([
                 calc_days_in_india(travel_data, 
                     datetime(start_fy + j, 4, 1), 
